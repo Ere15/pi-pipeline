@@ -14,10 +14,15 @@
 import { ok, strictEqual } from "node:assert/strict";
 import {
 	type OrcaError,
+	backoffDelayMs,
 	checkMessages,
 	createTerminal,
 	createWorktree,
+	DEFAULT_ATTEMPTS,
+	DEFAULT_BACKOFF_MS,
+	DEFAULT_TIMEOUT_MS,
 	dispatchTask,
+	formatOrcaError,
 	releaseWorker,
 	replyToMessage,
 } from "./orca-shims.ts";
@@ -85,6 +90,27 @@ if [ "$n" -eq 1 ]; then
   exit 1
 fi
 printf '%s' '${secondPayload}'
+`;
+}
+
+/** Fake `orca` that always fails, counting invocations. */
+function countingFailScript(stderrText: string): string {
+	return `#!/bin/sh
+[ -n "$FAKE_ORCA_LOG" ] && echo "$@" >> "$FAKE_ORCA_LOG"
+n=$(cat "$FAKE_ORCA_COUNT" 2>/dev/null || echo 0)
+echo $((n + 1)) > "$FAKE_ORCA_COUNT"
+printf '%s\\n' '${stderrText}' >&2
+exit 1
+`;
+}
+
+/** Fake `orca` that counts invocations, then hangs in `sleep`. */
+function countingSleepScript(seconds: number): string {
+	return `#!/bin/sh
+[ -n "$FAKE_ORCA_LOG" ] && echo "$@" >> "$FAKE_ORCA_LOG"
+n=$(cat "$FAKE_ORCA_COUNT" 2>/dev/null || echo 0)
+echo $((n + 1)) > "$FAKE_ORCA_COUNT"
+sleep ${seconds}
 `;
 }
 
@@ -278,7 +304,7 @@ Deno.test({
 });
 
 Deno.test({
-	name: "dispatch retries a lost reply once with the same retry-request id",
+	name: "dispatch retries a lost reply within the attempt budget under one retry-request id",
 	permissions: PERMS,
 	fn: async () => {
 		await withFakeOrca(flakyScript("socket hang up", '{"dispatchId":"d-7"}'), async (dir) => {
@@ -495,6 +521,262 @@ Deno.test({
 			const result = await releaseWorker({ dispatchId: "d-1" });
 			ok(!result.ok);
 			strictEqual((result.error as OrcaError).detail, "release failed: invalid arguments");
+		});
+	},
+});
+
+// Recovery policy (ADR-002 section 3): attempts, backoff, abort, grace, codes.
+// Pure-function checks need no subprocess permissions.
+
+Deno.test("backoffDelayMs doubles the base per retry", () => {
+	strictEqual(backoffDelayMs(1, 500), 500);
+	strictEqual(backoffDelayMs(2, 500), 1000);
+	strictEqual(backoffDelayMs(3, 500), 2000);
+});
+
+Deno.test("backoffDelayMs caps runaway delays at ten seconds", () => {
+	strictEqual(backoffDelayMs(99, 500), 10_000);
+});
+
+Deno.test("backoffDelayMs defaults to the standard base", () => {
+	strictEqual(backoffDelayMs(2), 2 * DEFAULT_BACKOFF_MS);
+});
+
+Deno.test("recovery defaults are three attempts and a 120s timeout", () => {
+	strictEqual(DEFAULT_ATTEMPTS, 3);
+	strictEqual(DEFAULT_TIMEOUT_MS, 120_000);
+});
+
+Deno.test("formatOrcaError renders the detail for string slots", () => {
+	strictEqual(
+		formatOrcaError({ code: "ORCA_TIMEOUT", retryable: true, detail: "dispatch timed out" }),
+		"dispatch timed out",
+	);
+});
+
+Deno.test({
+	name: "dispatch spends the full attempt budget on repeated lost replies",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(countingFailScript("socket hang up"), async (dir) => {
+			const { log, count } = recordTo(dir);
+			Deno.env.set("FAKE_ORCA_LOG", log);
+			Deno.env.set("FAKE_ORCA_COUNT", count);
+			try {
+				// WHY one id: every attempt replays the same call, so the
+				// server dedupes on the id issued by the first attempt.
+				const result = await dispatchTask({ taskId: "t-1", to: "h", attempts: 3, backoffMs: 10 });
+				ok(!result.ok);
+				strictEqual((result.error as OrcaError).code, "ORCA_TRANSPORT");
+				ok((result.error as OrcaError).retryable);
+				strictEqual(await Deno.readTextFile(count), "3\n");
+				const ids = retryIds(await Deno.readTextFile(log));
+				strictEqual(ids.length, 3);
+				ok(ids.every((id) => id.length > 0 && id === ids[0]));
+			} finally {
+				Deno.env.delete("FAKE_ORCA_LOG");
+				Deno.env.delete("FAKE_ORCA_COUNT");
+			}
+		});
+	},
+});
+
+Deno.test({
+	name: "dispatch stops after attempts 1 with a retryable error",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(countingFailScript("socket hang up"), async (dir) => {
+			const { count } = recordTo(dir);
+			Deno.env.set("FAKE_ORCA_COUNT", count);
+			try {
+				const result = await dispatchTask({ taskId: "t-1", to: "h", attempts: 1, backoffMs: 1 });
+				ok(!result.ok);
+				strictEqual((result.error as OrcaError).code, "ORCA_TRANSPORT");
+				ok((result.error as OrcaError).retryable);
+				strictEqual(await Deno.readTextFile(count), "1\n");
+			} finally {
+				Deno.env.delete("FAKE_ORCA_COUNT");
+			}
+		});
+	},
+});
+
+Deno.test({
+	name: "dispatch backs off exponentially between attempts",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(countingFailScript("socket hang up"), async (dir) => {
+			const { count } = recordTo(dir);
+			Deno.env.set("FAKE_ORCA_COUNT", count);
+			try {
+				const t0 = Date.now();
+				const result = await dispatchTask({ taskId: "t-1", to: "h", attempts: 3, backoffMs: 100 });
+				const elapsed = Date.now() - t0;
+				ok(!result.ok);
+				strictEqual((result.error as OrcaError).code, "ORCA_TRANSPORT");
+				strictEqual(await Deno.readTextFile(count), "3\n");
+				// WHY lower bound only: CI slowness stretches the 100+200ms
+				// gaps, never shrinks them.
+				ok(elapsed >= 250, `backoff too tight: ${elapsed}ms`);
+			} finally {
+				Deno.env.delete("FAKE_ORCA_COUNT");
+			}
+		});
+	},
+});
+
+Deno.test({
+	name: "dispatch maps a real per-attempt timeout to ORCA_TIMEOUT and retries",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(countingSleepScript(5), async (dir) => {
+			const { count } = recordTo(dir);
+			Deno.env.set("FAKE_ORCA_COUNT", count);
+			try {
+				const t0 = Date.now();
+				const result = await dispatchTask({ taskId: "t-1", to: "h", timeoutMs: 300, attempts: 2, backoffMs: 10 });
+				const elapsed = Date.now() - t0;
+				ok(!result.ok);
+				strictEqual((result.error as OrcaError).code, "ORCA_TIMEOUT");
+				ok((result.error as OrcaError).retryable);
+				strictEqual(
+					(result.error as OrcaError).detail,
+					"dispatch timed out: retry with same retry-request id",
+				);
+				strictEqual(await Deno.readTextFile(count), "2\n");
+				ok(elapsed >= 500, `two timeouts plus backoff expected: ${elapsed}ms`);
+				ok(elapsed < 20_000, `runaway wait: ${elapsed}ms`);
+			} finally {
+				Deno.env.delete("FAKE_ORCA_COUNT");
+			}
+		});
+	},
+});
+
+Deno.test({
+	name: "check abort surfaces ORCA_ABORTED without retry",
+	permissions: PERMS,
+	fn: async () => {
+		const script = `#!/bin/sh\nprintf 'called\\n' >> "$FAKE_ORCA_COUNT"\nsleep 30\n`;
+		await withFakeOrca(script, async (dir) => {
+			const { count } = recordTo(dir);
+			Deno.env.set("FAKE_ORCA_COUNT", count);
+			try {
+				const ctl = new AbortController();
+				const pending = checkMessages({ waitMs: 60_000, timeoutMs: 120_000, signal: ctl.signal });
+				setTimeout(() => ctl.abort(), 200);
+				const t0 = Date.now();
+				const result = await pending;
+				const elapsed = Date.now() - t0;
+				ok(!result.ok);
+				strictEqual((result.error as OrcaError).code, "ORCA_ABORTED");
+				ok(!(result.error as OrcaError).retryable);
+				strictEqual(await Deno.readTextFile(count), "called\n");
+				ok(elapsed < 5000, `abort too slow: ${elapsed}ms`);
+			} finally {
+				Deno.env.delete("FAKE_ORCA_COUNT");
+			}
+		});
+	},
+});
+
+Deno.test({
+	name: "abort during backoff surfaces ORCA_ABORTED",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(countingFailScript("socket hang up"), async (dir) => {
+			const { count } = recordTo(dir);
+			Deno.env.set("FAKE_ORCA_COUNT", count);
+			try {
+				const ctl = new AbortController();
+				setTimeout(() => ctl.abort(), 200);
+				const result = await dispatchTask({
+					taskId: "t-1",
+					to: "h",
+					attempts: 3,
+					backoffMs: 5000,
+					signal: ctl.signal,
+				});
+				ok(!result.ok);
+				strictEqual((result.error as OrcaError).code, "ORCA_ABORTED");
+				ok(!(result.error as OrcaError).retryable);
+				strictEqual(await Deno.readTextFile(count), "1\n");
+			} finally {
+				Deno.env.delete("FAKE_ORCA_COUNT");
+			}
+		});
+	},
+});
+
+Deno.test({
+	name: "check timeout grace outlives a short explicit timeoutMs",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(sh("sleep 2\nprintf '%s' '{\"messages\":[]}'\n"), async () => {
+			const t0 = Date.now();
+			// WHY grace: waitMs promises a 1s long poll, so the client
+			// timeout outlives it by 10s; the explicit 500ms timeout
+				// must not cut a healthy poll short.
+			const result = await checkMessages({ waitMs: 1000, timeoutMs: 500, attempts: 1 });
+			const elapsed = Date.now() - t0;
+			ok(result.ok);
+			strictEqual(result.data.messages.length, 0);
+			ok(elapsed >= 1500, `grace did not hold: ${elapsed}ms`);
+		});
+	},
+});
+
+Deno.test({
+	name: "empty stdout is ORCA_EMPTY_RESPONSE and not retryable",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(sh("exit 0\n"), async () => {
+			const result = await checkMessages({ attempts: 1 });
+			ok(!result.ok);
+			strictEqual((result.error as OrcaError).code, "ORCA_EMPTY_RESPONSE");
+			ok(!(result.error as OrcaError).retryable);
+			strictEqual((result.error as OrcaError).detail, "check failed: empty response from orca");
+		});
+	},
+});
+
+Deno.test({
+	name: "unreadable stdout is ORCA_BAD_RESPONSE and not retryable",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(sh("printf '%s' 'not json {'\n"), async () => {
+			const result = await checkMessages({ attempts: 1 });
+			ok(!result.ok);
+			strictEqual((result.error as OrcaError).code, "ORCA_BAD_RESPONSE");
+			ok(!(result.error as OrcaError).retryable);
+			strictEqual((result.error as OrcaError).detail, "check failed: unreadable response from orca");
+		});
+	},
+});
+
+Deno.test({
+	name: "worktree missing id is ORCA_BAD_RESPONSE and not retryable",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(jsonScript('{"name":"x"}'), async () => {
+			const result = await createWorktree({ name: "x", attempts: 1 });
+			ok(!result.ok);
+			strictEqual((result.error as OrcaError).code, "ORCA_BAD_RESPONSE");
+			ok(!(result.error as OrcaError).retryable);
+		});
+	},
+});
+
+Deno.test({
+	name: "unknown failures are ORCA_UNKNOWN, not retryable, and hide stderr",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(failScript("kaboom ref=sk-SECRET-99"), async () => {
+			const result = await dispatchTask({ taskId: "t-1", to: "term-1", attempts: 1 });
+			ok(!result.ok);
+			strictEqual((result.error as OrcaError).code, "ORCA_UNKNOWN");
+			ok(!(result.error as OrcaError).retryable);
+			ok(!(result.error as OrcaError).detail.includes("SECRET-99"));
 		});
 	},
 });
