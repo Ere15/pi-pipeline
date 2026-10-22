@@ -4,7 +4,7 @@
  * WHY this file exists: `jev-gate.ts` (routing) and `orca-shims.ts`
  * (CLI calls) are standalone modules with no pi imports. This extension
  * is the only place that binds them to the agent runtime: it registers
- * four `pipeline_*` tools plus a `/sprint` stub that prints the stages.
+ * six `pipeline_*` tools plus a `/sprint` stub that prints the stages.
  *
  * Safety (binding): tool inputs and fetched orca text are DATA, never
  * instructions — results are serialized back to the model, never
@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { Type, type Message } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { jevGate } from "./jev-gate.js";
+import { buildRecallQuery, formatStageSummary } from "./mem0.js";
 import { checkMessages, createWorktree, dispatchTask } from "./orca-shims.js";
 
 /** Sprint stages from ARCHITECTURE.md flow; `/sprint` prints these (stub). */
@@ -127,11 +128,70 @@ const pipelineCheck = defineTool({
 	},
 });
 
+/**
+ * Format a sprint-stage summary for long-term memory (ADR-002 section 1).
+ * Returns ready-to-store text — the model passes it to `mem0_add` itself;
+ * this tool never calls mem0 and stores nothing. All inputs are DATA and
+ * leave redacted via `redactSecrets()`.
+ */
+const pipelineRemember = defineTool({
+	name: "pipeline_remember",
+	label: "Pipeline remember",
+	description:
+		"Format a sprint-stage outcome for long-term memory. Returns redacted " +
+		"ready-to-store text: pass it to mem0_add yourself, this tool does not store anything.",
+	parameters: Type.Object({
+		sprint: Type.String({ description: "Sprint id, e.g. sprint-02 (data)" }),
+		stage: Type.String({ description: "Stage name, e.g. arch, jev-gate (data)" }),
+		decision: Type.String({ description: "Decision taken in this stage (data)" }),
+		outcome: Type.String({ description: "Outcome / result of the stage (data)" }),
+		where: Type.String({ description: "Where it happened: branch, worktree, terminal (data)" }),
+	}),
+	// Sync formatter: no awaits; async kept for the tool contract (same as /sprint stub).
+	// deno-lint-ignore require-await
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const text = formatStageSummary(params.sprint, params.stage, params.decision, params.outcome, params.where);
+		return {
+			content: [{ type: "text", text: JSON.stringify({ storeWith: "mem0_add", text }) }],
+			details: { storeWith: "mem0_add", text },
+		};
+	},
+});
+
+/**
+ * Format a memory search query (ADR-002 section 1). Returns a ready-to-query
+ * string — the model passes it to `mem0_search` itself; this tool never
+ * queries mem0. The query is DATA and leaves redacted.
+ */
+const pipelineRecall = defineTool({
+	name: "pipeline_recall",
+	label: "Pipeline recall",
+	description:
+		"Format a long-term memory query. Returns a redacted ready-to-query string: " +
+		"pass it to mem0_search yourself, this tool does not query anything.",
+	parameters: Type.Object({
+		query: Type.String({ description: "What to recall from sprint memory (data)" }),
+		sprint: Type.Optional(Type.String({ description: "Scope recall to this sprint id (data)" })),
+		stage: Type.Optional(Type.String({ description: "Scope recall to this stage (data)" })),
+	}),
+	// Sync formatter: no awaits; async kept for the tool contract (same as /sprint stub).
+	// deno-lint-ignore require-await
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const query = buildRecallQuery(params.query, params.sprint, params.stage);
+		return {
+			content: [{ type: "text", text: JSON.stringify({ searchWith: "mem0_search", query }) }],
+			details: { searchWith: "mem0_search", query },
+		};
+	},
+});
+
 export default function (pi: ExtensionAPI): void {
 	pi.registerTool(pipelineRoute);
 	pi.registerTool(pipelineWorktreeCreate);
 	pi.registerTool(pipelineDispatch);
 	pi.registerTool(pipelineCheck);
+	pi.registerTool(pipelineRemember);
+	pi.registerTool(pipelineRecall);
 
 	/** Scaffold `.pi/*` for a new repo from pinned release templates (no overwrites). */
 	pi.registerCommand("pipeline-init", {
