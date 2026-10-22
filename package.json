@@ -6,6 +6,12 @@
   "keywords": [
     "pi-package"
   ],
+  "files": [
+    "extensions/",
+    "skills/",
+    "prompts/",
+    "README.md"
+  ],
   "pi": {
     "skills": [
       "./skills/*"
