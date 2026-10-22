@@ -11,7 +11,7 @@ orca status --json
 # проверить:
 pi mcp list   # exit 1 = чинить до волны
 pi update     # свежесть пакетов/скиллов, не посреди волны
-# Память: recall перед стартом — «похожие прошлые задачи?» (оценки, грабли, прецеденты).
+# Память: recall перед стартом — mem0_search «похожие прошлые задачи?» (оценки, грабли, прецеденты).
 orca orchestration run-create --objective "sprint-N: <цель> | budget-stop: $<N, дефолт 10>" --json
 # → run_id. Бюджет: стоп-кран на frontier-траты; при достижении — стоп волны + unread + ждать человека.
 ```
@@ -122,7 +122,7 @@ orca orchestration worker-start --task <t-fix> --terminal term-<x> --json
 ```bash
 # CI зелёный + REVIEW закрыт + readability подписан → мерж staging в main делает координатор.
 # PR-ссылки — в references worktree. Затем отчёт команде (по Task: исход, evidence, блокеры).
-# Память: remember выжимки стадий (решение → исход → где лежит), без секретов.
+# Память: remember выжимки стадий через mem0_add (run_id этого спринта), без секретов.
 orca orchestration worker-release --dispatch <последний disp каждого терминала> --json
 orca terminal close --worktree name:feat-<x> --all  # по каждому
 orca worktree rm --worktree name:feat-<x> --force
