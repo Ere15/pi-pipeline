@@ -210,7 +210,7 @@ export default function (pi: ExtensionAPI): void {
 					return i > 0 ? [[part.slice(0, i), part.slice(i + 1)]] : [];
 				}),
 			);
-			const ref = (params["ref"] ?? "v0.3.0").replace(/[^\w.\-]/g, "");
+			const ref = (params["ref"] ?? "v0.3.1").replace(/[^\w.\-]/g, "");
 			const plan = params["plan"] === "max" ? "max" : "pro";
 			const cwd = process.cwd();
 			const lines: string[] = [];
@@ -250,7 +250,14 @@ export default function (pi: ExtensionAPI): void {
 					hasAgents = true;
 				} catch { /* missing */ }
 			}
-			if (!hasAgents) lines.push("WARN: no AGENTS.md/CLAUDE.md — reviewer checks conventions against it");
+			if (!hasAgents) {
+				try {
+					await writeNew("AGENTS.md", await fetchText("templates/AGENTS.starter.md"));
+					lines.push("FILL the <placeholders> in AGENTS.md — reviewer treats it as source of truth");
+				} catch (error) {
+					lines.push(`WARN: no AGENTS.md/CLAUDE.md and starter fetch failed: ${error instanceof Error ? error.message : error}`);
+				}
+			}
 			lines.push(`next: orca repo add --path ${cwd} && orca repo set-base-ref --repo <id> --ref <default>`);
 			lines.push("next: grant project trust on first pi run in this repo");
 			const text = lines.join("\n");

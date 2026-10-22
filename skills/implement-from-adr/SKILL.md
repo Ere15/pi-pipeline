@@ -10,6 +10,16 @@ description: Implement a task from an ADR with tests, lint and typecheck green. 
 Read the ADR section for this task + repo `AGENTS.md` (source of truth for conventions).
 If ADR and `AGENTS.md` conflict, stop and ask — do not guess.
 
+## Engineering practices (hard rules — violation = rework)
+
+- No silent failures: every error is handled or propagated with context; empty catch, ignored return codes, and swallowed rejections are defects.
+- Validate at boundaries: module entries, API handlers, CLI args, and parsed files check their inputs; fail fast with a clear message.
+- Small pure functions; dependencies via parameters, not globals or hidden singletons.
+- Logs for a stranger on call: what happened + what to do next; never log secrets, tokens, or personal data.
+- Tests as a pyramid: unit tests on behaviour, integration tests on seams, e2e only for critical paths; every bugfix ships its regression test.
+- No new dependencies without a stated reason in the task; no dead code, no commented-out code, no TODO instead of code.
+- Atomic commits, conventional messages; one branch = one task.
+
 ## While writing (human-readable code)
 
 - Small functions, flat nesting, names readable without call context.
