@@ -51,5 +51,4 @@ Implement ×3 + fix ×4 (2 follow-up как reuse, без новых терми�
 - ADR-002, ROADMAP-02, REVIEW-sprint-02, ветки `Ere15/feat-mem0|tests|recovery` (смержены, удалены).
 - Run: `run_a8000e7d31d4`. Диспатчи (все released): ctx_4a65, ctx_7174, ctx_45eb, ctx_84bf, ctx_e091, ctx_d863.
 - Установки за спринт: нет.
-- mem0-remember НЕ записан (502 дважды, wake 307): pending, повторить вручную.
-  Урок: remember_coordinator — с ретраем и бэкоффом (тема recovery), тихий пропуск запрещён.
+- mem0-remember: 502 дважды в день спринта (upstream LLM сервиса), зафлашено позже — verified чтением. Урок: remember — с ретраем и бэкоффом, тихий пропуск запрещён.
