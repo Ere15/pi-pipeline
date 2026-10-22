@@ -1,9 +1,4 @@
 {
-  "askClaude": {
-    "enabled": true,
-    "allowFullMode": true,
-    "defaultIsolated": false
-  },
   "provider": {
     "plan": "pro"
   }
