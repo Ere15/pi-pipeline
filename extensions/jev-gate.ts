@@ -26,8 +26,8 @@ import type {
 
 /** Classifier identity pinned by the ADR. */
 export const JEV_PROVIDER = "opencode";
-export const JEV_MODEL_ID = "jev-1.13";
-export const JEV_DECIDED_BY = "jev-1.13";
+export const JEV_MODEL_ID = "jev-1.13-free";
+export const JEV_DECIDED_BY = "jev-1.13-free";
 
 /** Route the gate can return. */
 export type JevRoute = "general" | "frontier";

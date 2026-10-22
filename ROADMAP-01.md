@@ -18,7 +18,7 @@ pi-воркеров через `worker-start --terminal`. Проверяем ж�
 2. ARCH-лайт — `docs/arch/ADR-001-pipeline-ts.md` (компоновка модуля, что отложено).
    Гейт: координатор-frontier.
 3. FAN-OUT × 3 (параллельно, живые терминалы):
-   - T1/feat-pipe-jev — Jev-гейт: classify через `opencode/jev-1.13`, route + confidence + бюджетные капы.
+   - T1/feat-pipe-jev — Jev-гейт: classify через `opencode/jev-1.13-free`, route + confidence + бюджетные капы.
    - T2/feat-pipe-orca — orca-шимы: `worktree/terminal/dispatch/check/reply/release` поверх `orca --json`, парсинг, retry-request.
    - T3/feat-pipe-wire — wiring: регистрация тулов + `/sprint`-заглушка + smoke (импорт без старта pi).
 4. INTEGRATION (deps на T1–T3): слияние в `sprint-01` staging, `tsc --noEmit` + smoke зелёные.

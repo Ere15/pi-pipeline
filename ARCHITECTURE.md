@@ -29,7 +29,7 @@ orca = пульт + учёт, 2 подписки, Jev из подписки Open
 ┌──────────────────────▼───────────────────────────────┐
 │ PI — исполнение, ОДИН харнес                         │
 │ координатор (opencode-go) + workers все pi           │
-│ DECISION: rules → opencode/jev-1.13 → модель         │
+│ DECISION: rules → opencode/jev-1.13-free → модель         │
 │ general → opencode-go │ frontier → anthropic/*       │
 │ скиллы/MCP из глобального пакета                     │
 └──────────────────────────────────────────────────────┘
@@ -123,7 +123,7 @@ term-review (pi, frontier)        — архитектура в начале, р
 `.pi/bifrost.json`: `quick/general → opencode-go`, `frontier → anthropic/* + claude-bridge/*`
 (стратегия `first` + circuit-breaker). Правила детерминированно:
 `архитектура|ADR|миграция|auth → frontier`, `ревью спринта|code review → frontier`.
-Классификатор `pi-native` на `opencode/jev-1.13`, `minConfidence 0.8`, ниже — default + пометка.
+Классификатор `pi-native` на `opencode/jev-1.13-free`, `minConfidence 0.8`, ниже — default + пометка.
 `/bifrost preview --json` — проверка маршрута без генерации.
 
 ## Модели и thinking

@@ -38,7 +38,7 @@
   "classifier": {
     "enabled": true,
     "backend": "pi-native",
-    "piNative": { "model": "opencode/jev-1.13" },
+    "piNative": { "model": "opencode/jev-1.13-free" },
     "minConfidence": 0.8,
     "fallback": "regex",
     "criteria": {

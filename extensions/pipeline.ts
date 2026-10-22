@@ -134,7 +134,9 @@ export default function (pi: ExtensionAPI): void {
 	// Skeleton stub: prints the stage list, performs no orchestration.
 	pi.registerCommand("sprint", {
 		description: "Print the sprint pipeline stages (skeleton stub)",
-		handler: (_args, ctx) => {
+		// Command contract requires Promise<void>; handler is intentionally sync-bodied.
+		// deno-lint-ignore require-await
+		handler: async (_args, ctx) => {
 			const text = ["sprint pipeline stages (skeleton):", ...SPRINT_STAGES].join("\n");
 			// WHY branch: console.log writes raw stdout into the TUI transcript
 			// when a UI is attached, so route output through the UI there;
