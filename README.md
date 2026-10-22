@@ -9,7 +9,8 @@ mem0 for cross-sprint memory.
 ## Install
 
 ```bash
-pi install npm:pi-pipeline
+pi install npm:pi-pipeline       # once published (needs npm 2FA)
+pi install git:github.com/Ere15/pi-pipeline@v0.1.0   # works today, pinned
 ```
 
 Requires pi 1.x, an OpenCode Go/Zen subscription (chat + free Jev classifier),
