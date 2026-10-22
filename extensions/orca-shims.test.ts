@@ -13,6 +13,7 @@
 
 import { ok, strictEqual } from "node:assert/strict";
 import {
+	type OrcaError,
 	checkMessages,
 	createTerminal,
 	createWorktree,
@@ -129,7 +130,7 @@ Deno.test({
 		await withFakeOrca(jsonScript('{"name":"x"}'), async () => {
 			const result = await createWorktree({ name: "x" });
 			ok(!result.ok);
-			strictEqual(result.error, "worktree failed: response missing worktree id");
+			strictEqual((result.error as OrcaError).detail, "worktree failed: response missing worktree id");
 		});
 	},
 });
@@ -141,7 +142,7 @@ Deno.test({
 		await withFakeOrca(failScript("worktree not found: wt-1"), async () => {
 			const result = await createWorktree({ name: "wt-1" });
 			ok(!result.ok);
-			strictEqual(result.error, "worktree failed: target not found");
+			strictEqual((result.error as OrcaError).detail, "worktree failed: target not found");
 		});
 	},
 });
@@ -153,16 +154,19 @@ Deno.test({
 		await withFakeOrca(failScript("upstream timeout after 30s"), async () => {
 			const result = await createWorktree({ name: "wt-1" });
 			ok(!result.ok);
+			ok(!(result.error as OrcaError).detail.includes("upstream timeout"));
+			strictEqual((result.error as OrcaError).code, "ORCA_TIMEOUT");
+			ok((result.error as OrcaError).retryable);
 			strictEqual(
-				result.error,
-				"orca timed out during worktree: retry with same retry-request id",
+				(result.error as OrcaError).detail,
+				"worktree timed out: retry with same retry-request id",
 			);
 		});
 	},
 });
 
 Deno.test({
-	name: "worktree create does not retry a lost reply without an idempotency flag",
+	name: "worktree create retries a lost reply under the same retry-request id",
 	permissions: PERMS,
 	fn: async () => {
 		await withFakeOrca(flakyScript("socket hang up", '{"id":"w-2"}'), async (dir) => {
@@ -171,9 +175,9 @@ Deno.test({
 			Deno.env.set("FAKE_ORCA_COUNT", count);
 			try {
 				const result = await createWorktree({ name: "wt-1" });
-				ok(!result.ok);
-				strictEqual(result.error, "worktree failed: unknown orca error");
-				strictEqual(await Deno.readTextFile(count), "1\n");
+				ok(result.ok);
+				strictEqual(result.data.id, "w-2");
+				strictEqual(await Deno.readTextFile(count), "2\n");
 			} finally {
 				Deno.env.delete("FAKE_ORCA_LOG");
 				Deno.env.delete("FAKE_ORCA_COUNT");
@@ -193,7 +197,7 @@ Deno.test({
 		try {
 			const result = await createWorktree({ name: "wt-1" });
 			ok(!result.ok);
-			strictEqual(result.error, "orca unavailable: CLI not installed");
+			strictEqual((result.error as OrcaError).detail, "orca unavailable: CLI not installed");
 		} finally {
 			Deno.env.set("PATH", prev);
 			await Deno.remove(dir, { recursive: true });
@@ -216,13 +220,17 @@ Deno.test({
 });
 
 Deno.test({
-	name: "terminal create falls back to unknown instead of inventing a handle",
+	name: "terminal create reports a missing handle instead of inventing one",
 	permissions: PERMS,
 	fn: async () => {
 		await withFakeOrca(jsonScript("{}"), async () => {
 			const result = await createTerminal({});
-			ok(result.ok);
-			strictEqual(result.data.handle, "unknown");
+			ok(!result.ok);
+			strictEqual((result.error as OrcaError).code, "ORCA_BAD_RESPONSE");
+			strictEqual(
+				(result.error as OrcaError).detail,
+				"terminal failed: response missing terminal handle",
+			);
 		});
 	},
 });
@@ -260,7 +268,7 @@ Deno.test({
 		await withFakeOrca(jsonScript('{"ok":true}'), async () => {
 			const result = await dispatchTask({ taskId: "t-1", to: "term-1" });
 			ok(!result.ok);
-			strictEqual(result.error, "dispatch failed: response missing dispatch id");
+			strictEqual((result.error as OrcaError).detail, "dispatch failed: response missing dispatch id");
 		});
 	},
 });
@@ -322,7 +330,7 @@ Deno.test({
 			try {
 				const result = await dispatchTask({ taskId: "t-9", to: "term-1" });
 				ok(!result.ok);
-				strictEqual(result.error, "dispatch failed: target not found");
+				strictEqual((result.error as OrcaError).detail, "dispatch failed: target not found");
 				strictEqual(await Deno.readTextFile(count), "1\n");
 			} finally {
 				Deno.env.delete("FAKE_ORCA_COUNT");
@@ -338,11 +346,8 @@ Deno.test({
 		await withFakeOrca(failScript("kaboom ref=sk-SECRET-99"), async () => {
 			const result = await dispatchTask({ taskId: "t-1", to: "term-1" });
 			ok(!result.ok);
-			strictEqual(
-				result.error,
-				"dispatch failed: unknown orca error (outcome unknown, safe to retry)",
-			);
-			ok(!result.error.includes("SECRET-99"));
+			strictEqual((result.error as OrcaError).code, "ORCA_UNKNOWN");
+			ok(!(result.error as OrcaError).detail.includes("SECRET-99"));
 		});
 	},
 });
@@ -381,7 +386,7 @@ Deno.test({
 		await withFakeOrca(sh("exit 0\n"), async () => {
 			const result = await checkMessages({});
 			ok(!result.ok);
-			strictEqual(result.error, "check failed: empty response from orca");
+			strictEqual((result.error as OrcaError).detail, "check failed: empty response from orca");
 		});
 	},
 });
@@ -393,7 +398,7 @@ Deno.test({
 		await withFakeOrca(sh("printf '%s' 'not json {'\n"), async () => {
 			const result = await checkMessages({});
 			ok(!result.ok);
-			strictEqual(result.error, "check failed: unreadable response from orca");
+			strictEqual((result.error as OrcaError).detail, "check failed: unreadable response from orca");
 		});
 	},
 });
@@ -405,7 +410,7 @@ Deno.test({
 		await withFakeOrca(failScript("no dispatch bound for terminal"), async () => {
 			const result = await checkMessages({});
 			ok(!result.ok);
-			strictEqual(result.error, "check failed: nothing to act on");
+			strictEqual((result.error as OrcaError).detail, "check failed: nothing to act on");
 		});
 	},
 });
@@ -425,13 +430,17 @@ Deno.test({
 });
 
 Deno.test({
-	name: "reply falls back to the request id when the response has none",
+	name: "reply reports a missing message id instead of inventing one",
 	permissions: PERMS,
 	fn: async () => {
 		await withFakeOrca(jsonScript("{}"), async () => {
 			const result = await replyToMessage({ id: "q-3", body: "hi" });
-			ok(result.ok);
-			strictEqual(result.data.messageId, "q-3");
+			ok(!result.ok);
+			strictEqual((result.error as OrcaError).code, "ORCA_BAD_RESPONSE");
+			strictEqual(
+				(result.error as OrcaError).detail,
+				"reply failed: response missing message id",
+			);
 		});
 	},
 });
@@ -443,7 +452,7 @@ Deno.test({
 		await withFakeOrca(failScript("permission denied for reply"), async () => {
 			const result = await replyToMessage({ id: "q-1", body: "hi" });
 			ok(!result.ok);
-			strictEqual(result.error, "reply failed: permission denied");
+			strictEqual((result.error as OrcaError).detail, "reply failed: permission denied");
 		});
 	},
 });
@@ -481,7 +490,7 @@ Deno.test({
 		await withFakeOrca(failScript("invalid arguments (usage: orca release)"), async () => {
 			const result = await releaseWorker({ dispatchId: "d-1" });
 			ok(!result.ok);
-			strictEqual(result.error, "release failed: invalid arguments");
+			strictEqual((result.error as OrcaError).detail, "release failed: invalid arguments");
 		});
 	},
 });
