@@ -3,10 +3,19 @@
   "version": "0.1.0",
   "description": "Sprint pipeline for pi: opencode-go routine, frontier arch/review, orca worktrees, Jev routing, mem0 memory",
   "license": "MIT",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "pi": {
-    "skills": ["./skills/*"],
-    "prompts": ["./prompts/*.md"]
+    "skills": [
+      "./skills/*"
+    ],
+    "prompts": [
+      "./prompts/*.md"
+    ],
+    "extensions": [
+      "./extensions/pipeline.ts"
+    ]
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
