@@ -55,7 +55,18 @@ route: arch.p>=0.7 ИЛИ risk.value>=1.5 ИЛИ owner==frontier → frontier-м
 В Task spec дописать: "Routing: decided by jev arch=0.91 risk=1.7 → frontier".
 ```
 
-## 3. FAN-OUT (по worktree + терминалу на направление, reuse внутри)
+## 3. FAN-OUT — живые терминалы (уроки sprint-01)
+
+```bash
+# terminal create --command "pi" НЕ выживает (процесс умирает, handle stales).
+# Рабочий путь: создать шелл-терминал -> отправить запуск pi -> дождаться TUI -> диспатч.
+orca terminal create --worktree name:feat-<x> --json
+# -> term-<x> (запомнить handle; при terminal_handle_stale — только re-list и замена)
+orca terminal send --terminal term-<x> --text "pi --model <модель стадии> --thinking <уровень>" --enter --json
+# дождаться TUI в выводе (модель и worktree в футтере), затем:
+orca orchestration worker-start --task <t> --terminal term-<x> --worktree name:feat-<x> --json
+# --worktree при reuse обязателен, иначе terminal_worktree_mismatch. Run — свежий, этого спринта.
+```
 
 ```bash
 orca worktree create --name feat-<x> --json
@@ -66,7 +77,8 @@ orca orchestration worker-start --task <t1> --terminal term-<x> --json
 # Ownership: только worktree feat-<x>. Acceptance: pnpm test <scope> green (N passed),
 # lint clean, typecheck clean, evidence: <cmd + хвост + токены/стоимость>, files-modified, report-path.
 # Use /skill:implement-from-adr. Модель старта — general/medium; frontier-задачи по спеку
-# переключаются внутри на anthropic/sonnet, high. Параллельно max 3 направления, остальные в очереди.
+# переключаются внутри на claude-bridge/sonnet, high. Параллельно max 3 направления, остальные в очереди.
+# Воркер ОБЯЗАН закоммитить результат в ветке своего worktree — незакоммиченный done неполный.
 orca orchestration check --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json
 # validate done: evidence есть? тесты зелёные? нет → вернуть (done-check).
 # вопросы → reply. следующий таск на ТОТ ЖЕ терминал:

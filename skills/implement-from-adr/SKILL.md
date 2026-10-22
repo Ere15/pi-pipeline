@@ -27,6 +27,7 @@ typecheck          → clean
 files-modified: [...]
 report-path: <where full log lives>
 spent: <токены/$, для бюджета спринта>
+commit: результат закоммичен в ветке своего worktree (незакоммиченный done неполный)
 ```
 
 `worker_done` without this evidence is rejected. Third identical failure in a row →
