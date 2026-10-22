@@ -1,0 +1,44 @@
+=== T3 REVIEW must-fix item 2 evidence ===
+date: 2026-10-22T21:04:16Z
+branch: Ere15/feat-recovery
+fix: break unless (retryable && retryRequest defined); creates attempt once
+
+--- tsc (project config) ---
+tsc exit: 0
+
+--- deno lint ---
+Checked 2 files
+
+--- deno test (canonical flags from test header) ---
+[0m[32mCheck[0m extensions/orca-shims.test.ts
+[0m[38;5;245mrunning 27 tests from ./extensions/orca-shims.test.ts[0m
+worktree create returns the id and name from the response ... [0m[32mok[0m [0m[38;5;245m(113ms)[0m
+worktree create accepts the id alias and falls back to the requested name ... [0m[32mok[0m [0m[38;5;245m(16ms)[0m
+worktree create reports a missing id instead of inventing one ... [0m[32mok[0m [0m[38;5;245m(27ms)[0m
+worktree create maps a missing target to a short error ... [0m[32mok[0m [0m[38;5;245m(17ms)[0m
+worktree create maps timeout wording without leaking stderr ... [0m[32mok[0m [0m[38;5;245m(26ms)[0m
+worktree create does not retry a lost reply without an idempotency id ... [0m[32mok[0m [0m[38;5;245m(17ms)[0m
+worktree create reports an unavailable CLI instead of a spawn stack ... [0m[32mok[0m [0m[38;5;245m(11ms)[0m
+terminal create returns the handle from the response ... [0m[32mok[0m [0m[38;5;245m(24ms)[0m
+terminal create reports a missing handle instead of inventing one ... [0m[32mok[0m [0m[38;5;245m(31ms)[0m
+dispatch returns the dispatch id from the response ... [0m[32mok[0m [0m[38;5;245m(15ms)[0m
+dispatch accepts the id alias ... [0m[32mok[0m [0m[38;5;245m(44ms)[0m
+dispatch reports a missing dispatch id instead of inventing one ... [0m[32mok[0m [0m[38;5;245m(28ms)[0m
+dispatch retries a lost reply once with the same retry-request id ... [0m[32mok[0m [0m[38;5;245m(525ms)[0m
+dispatch sends a caller-supplied retry-request id ... [0m[32mok[0m [0m[38;5;245m(7ms)[0m
+dispatch does not retry a definitive error ... [0m[32mok[0m [0m[38;5;245m(30ms)[0m
+dispatch maps unknown failures to a short error that hides stderr secrets ... [0m[32mok[0m [0m[38;5;245m(25ms)[0m
+check wraps a bare array envelope in messages ... [0m[32mok[0m [0m[38;5;245m(19ms)[0m
+check keeps an object envelope with its messages ... [0m[32mok[0m [0m[38;5;245m(29ms)[0m
+check reports empty stdout instead of parsing it ... [0m[32mok[0m [0m[38;5;245m(18ms)[0m
+check reports invalid JSON instead of guessing ... [0m[32mok[0m [0m[38;5;245m(8ms)[0m
+check maps nothing-to-act-on to a short error ... [0m[32mok[0m [0m[38;5;245m(9ms)[0m
+reply returns the message id from the response ... [0m[32mok[0m [0m[38;5;245m(16ms)[0m
+reply reports a missing message id instead of inventing one ... [0m[32mok[0m [0m[38;5;245m(20ms)[0m
+reply maps permission failures to a short error ... [0m[32mok[0m [0m[38;5;245m(22ms)[0m
+release returns the status from the response ... [0m[32mok[0m [0m[38;5;245m(15ms)[0m
+release maps already-released to success instead of an error ... [0m[32mok[0m [0m[38;5;245m(9ms)[0m
+release maps invalid arguments to a short error ... [0m[32mok[0m [0m[38;5;245m(11ms)[0m
+
+[0m[32mok[0m | 27 passed | 0 failed [0m[38;5;245m(1s)[0m
+

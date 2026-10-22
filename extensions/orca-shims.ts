@@ -270,11 +270,12 @@ function sleepAbortable(ms: number, signal?: AbortSignal): Promise<boolean> {
 /**
  * Spawn `orca --json …`, parse stdout, and retry retryable failures up to
  * `attempts` with exponential backoff under the same `--retry-request` id.
- * Only verbs whose CLI lists `--retry-request` may pass idempotent=true;
- * `worktree create` and `terminal create` do not list it, so they pass
- * false and never send the flag. Read-only verbs send one only when the
- * caller supplies it. Parse failures never retry: a reply arrived, so the
- * outcome is known and a retry could duplicate a mutating call.
+ * A retry happens only when an idempotency id exists: without one the
+ * server cannot dedupe, so retrying a lost reply could duplicate a
+ * mutating call (duplicate worktrees/terminals). `createWorktree` and
+ * `createTerminal` therefore attempt once unless the caller explicitly
+ * passes `retryRequest`. Parse failures never retry: a reply arrived, so
+ * the outcome is known and a retry could duplicate a mutating call.
  */
 async function runOrcaJson(
 	verb: string,
@@ -304,7 +305,10 @@ async function runOrcaJson(
 			return parseJsonEnvelope(stdout, verb);
 		} catch (err) {
 			lastError = toOrcaError(err, verb, signal);
-			if (!lastError.retryable) break;
+			// WHY no id, no retry: only a --retry-request id lets the server
+			// dedupe a replayed call; without one a retry after a lost reply
+			// risks a duplicate worktree/terminal/dispatch.
+			if (!lastError.retryable || retryRequest === undefined) break;
 			if (attempt < attempts) {
 				// WHY backoff between attempts: a wedged server needs room, not a hammer.
 				const aborted = await sleepAbortable(backoffDelayMs(attempt, backoffBase), signal);
