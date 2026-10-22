@@ -1,0 +1,38 @@
+=== T3 feat-recovery evidence ===
+date: 2026-10-22T20:47:46Z
+branch: Ere15/feat-recovery
+
+--- project tsc (tsconfig includes extensions/orca-shims.ts) ---
+tsc exit: 0
+
+--- deno check ---
+[0m[32mCheck[0m extensions/orca-shims.ts
+
+--- deno lint ---
+Checked 1 file
+lint exit: 0
+
+--- behavioral checks (stub orca on PATH, deno harness /tmp/verify/recovery.check.ts) ---
+PASS retry-success
+PASS retry-3-calls
+PASS retry-same-id
+PASS backoff-exp
+PASS attempts-1
+PASS notfound-fast
+PASS timeout-retry
+PASS timeout-elapsed
+PASS abort-check
+PASS abort-fast
+PASS no-invented-dispatch-id
+PASS no-invented-handle
+PASS already-released
+PASS defaults
+PASS backoff-1
+PASS backoff-2
+PASS backoff-3
+PASS backoff-cap
+PASS check-ok
+ALL RECOVERY CHECKS PASSED
+
+--- node import smoke ---
+node-smoke: function function 3 120000
