@@ -151,17 +151,25 @@ MCP vs скилл: MCP — руки и данные, скилл — когда �
 ## Файлы
 
 ```
-pi-pipeline/
+pi-pipeline/                      # git: github.com/Ere15/pi-pipeline (+ npm когда разблокируем 2FA)
   ARCHITECTURE.md               # этот файл
   PIPELINE.md                   # скрипт координатора (create-once/reuse/release + gateway)
+  ORCA.md                       # контракт для команды (пульт, карточки, гейты)
+  README.md                     # установка одной строкой
   skills/sprint-arch/SKILL.md
   skills/implement-from-adr/SKILL.md
   skills/sprint-review/SKILL.md
-  prompts/architect.md, implement.md, sprint-review.md  # тонкие обёртки (TODO)
-  .pi/bifrost.json              # тиры + pi-native jev
-  .pi/claude-bridge.json        # {"provider":{"plan":"..."}} (TODO: pro/max)
-  extensions/pipeline.ts        # Jev-гейт + orca-обёртки (TODO)
-  package.json                  # pi-package манифест (TODO)
+  prompts/architect.md, implement.md, sprint-review.md  # тонкие обёртки поверх скиллов
+  extensions/pipeline.ts        # тулы pipeline_*, /sprint, /pipeline-init, pipeline/auto
+  extensions/jev-gate.ts        # тир-гейт (opencode/jev-1.13-free + капы)
+  extensions/orca-shims.ts      # типизированные вызовы orca --json
+  calibration/cases.json        # 24 размеченных кейса + results-*.jsonl (replay)
+  docs/arch/ADR-NN-*.md         # архитектурные решения
+  runs/sprint-NN/               # ROADMAP + REVIEW + REPORT каждого спринта
+  .pi/bifrost.json              # тиры quick/general + frontier, pi-native jev
+  .pi/claude-bridge.json        # {provider:{plan}} — pro|max по подписке
+  package.json                  # pi-package манифест (files allowlist)
+  tsconfig.json                 # проверка extensions (tsc)
 ```
 
 ## Бюджеты (кастомные, дефолт $10)

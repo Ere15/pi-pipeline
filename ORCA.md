@@ -13,8 +13,8 @@
 
 ## Документы спринта (в репо)
 
-- `REPORT-sprint-NN.md` — итог: что сделано, чем доказано, траты, блокеры.
-- `REVIEW-sprint-NN.md` — вердикт ревью + must-fix.
+- `runs/sprint-NN/REPORT.md` — итог: что сделано, чем доказано, траты, блокеры.
+- `runs/sprint-NN/REVIEW.md` — вердикт ревью + must-fix.
 - `ROADMAP-NN.md` — цели, scope/non-goals, задачи.
 - `docs/arch/ADR-NN-*.md` — архитектурные решения (что/почему/что отбросили).
 
