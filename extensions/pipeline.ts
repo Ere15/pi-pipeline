@@ -210,7 +210,7 @@ export default function (pi: ExtensionAPI): void {
 					return i > 0 ? [[part.slice(0, i), part.slice(i + 1)]] : [];
 				}),
 			);
-			const ref = (params["ref"] ?? "v0.1.0").replace(/[^\w.\-]/g, "");
+			const ref = (params["ref"] ?? "v0.3.0").replace(/[^\w.\-]/g, "");
 			const plan = params["plan"] === "max" ? "max" : "pro";
 			const cwd = process.cwd();
 			const lines: string[] = [];
