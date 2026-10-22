@@ -1,0 +1,52 @@
+{
+  "$schema": "../schema.json",
+  "enabled": true,
+  "default": "general",
+  "strategy": "first",
+  "models": {
+    "quick": ["opencode-go/qwen3.8-flash"],
+    "general": [
+      "opencode-go/muse-spark-1.3-contributor",
+      "opencode-go/kimi-k3"
+    ],
+    "frontier": [
+      "anthropic/claude-opus-5",
+      "anthropic/claude-sonnet-5-5",
+      "claude-bridge/claude-opus-5",
+      "claude-bridge/claude-sonnet-5-5"
+    ]
+  },
+  "categoryStrategies": {
+    "quick": "first",
+    "general": "first",
+    "frontier": "first"
+  },
+  "rules": [
+    {
+      "pattern": "\\b(архитектура|ADR|миграция|auth|system architecture|api design)\\b",
+      "model": "frontier"
+    },
+    {
+      "pattern": "\\b(ревью спринта|code review|аудит|threat model|root-cause)\\b",
+      "model": "frontier"
+    },
+    {
+      "pattern": "\\b(unit tests?|integration tests?)\\b",
+      "model": "general"
+    }
+  ],
+  "classifier": {
+    "enabled": true,
+    "backend": "pi-native",
+    "piNative": { "model": "opencode/jev-1.13" },
+    "minConfidence": 0.8,
+    "fallback": "regex",
+    "criteria": {
+      "quick": "Bounded reversible work: formatting, renames, trivial edits",
+      "general": "Normal implementation, tests, docs on opencode-go",
+      "frontier": "Architecture, API/DB design, security, sprint review, complex debugging — Claude"
+    }
+  },
+  "cache": { "enabled": true, "maxEntries": 500, "threshold": 0.88 },
+  "reliability": { "enabled": true, "failureThreshold": 3, "windowMinutes": 5, "cooldownMinutes": 60 }
+}
