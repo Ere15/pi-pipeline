@@ -136,8 +136,14 @@ export default function (pi: ExtensionAPI): void {
 		description: "Print the sprint pipeline stages (skeleton stub)",
 		handler: async (_args, ctx) => {
 			const text = ["sprint pipeline stages (skeleton):", ...SPRINT_STAGES].join("\n");
-			console.log(text);
-			if (ctx.hasUI) ctx.ui.notify(text, "info");
+			// WHY branch: console.log writes raw stdout into the TUI transcript
+			// when a UI is attached, so route output through the UI there;
+			// stdout is the headless-only fallback.
+			if (ctx.hasUI) {
+				ctx.ui.notify(text, "info");
+			} else {
+				console.log(text);
+			}
 		},
 	});
 }
