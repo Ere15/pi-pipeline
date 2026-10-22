@@ -8,7 +8,10 @@ orca = пульт + учёт, 2 подписки, Jev из подписки Open
 - `opencode-go` (api_key, ready) — чат-модели рутины: `muse-spark-1.3`, `kimi-k3`, `qwen3.8-flash`
 - `opencode` (тот же ключ, ready) — классификатор `jev-1.13` / `jev-1.13-free`, только текст
 - `anthropic` (oauth, ready) — frontier-модели **внутри pi**: `claude-opus-5`, `sonnet-5-5` и др.
-- `claude-bridge` (Agent SDK, квота Claude) — запасной frontier-движок, сравнить с прямым `anthropic` за 1–2 спринта
+- `claude-bridge` (Agent SDK, квота Pro): движок — `claude-clean` (изолированный
+  `~/.claude-clean`, без хуков/MCP/памяти основного конфига). Проверено живьём.
+  Путь к исполняемому — только в глобальном `~/.pi/agent/claude-bridge.json`
+  (`pathToClaudeCodeExecutable`), в репо его нет (машинозависимо).
 - Прямой `typesafe`-ключ — не нужен
 
 ## Слои
