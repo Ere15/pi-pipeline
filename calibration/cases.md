@@ -1,0 +1,34 @@
+# Jev calibration set (v1, 24 cases)
+
+Expected route per case. Borderline cases marked `edge: true` — either answer
+acceptable, they measure confidence calibration, not accuracy.
+
+## frontier (12)
+
+1. {title: "Redesign session auth to OAuth2", body: "Migrate API + web to OAuth2, new token tables, all clients", files: ["src/auth/", "migrations/"], expect: frontier}
+2. {title: "Design payments API", body: "New REST API for charges/refunds, idempotency, webhooks", files: ["docs/arch/"], expect: frontier}
+3. {title: "Sprint review: payments + auth", body: "Review diff across 3 worktrees, security focus", files: [], expect: frontier}
+4. {title: "Migrate Postgres 14 to 16", body: "Major version upgrade, extensions check, downtime plan", files: ["infra/"], expect: frontier}
+5. {title: "Debug race in worker pool", body: "Flaky deadlock under load, goroutine dump attached", files: ["src/worker/"], expect: frontier}
+6. {title: "Threat model for public uploads", body: "Untrusted file uploads, AV scanning, sandboxing", files: ["src/uploads/"], expect: frontier}
+7. {title: "Shard users table by region", body: "1B rows, zero-downtime sharding design", files: ["db/"], expect: frontier}
+8. {title: "Audit JWT handling", body: "Review token issue/refresh/revoke for flaws", files: ["src/auth/"], expect: frontier}
+9. {title: "Memory leak in image pipeline", body: "RSS grows 2GB/day, heap profiles attached", files: ["src/images/"], expect: frontier}
+10. {title: "API versioning strategy", body: "v1/v2 coexistence, deprecation policy", files: ["docs/arch/"], expect: frontier}
+11. {title: "Production incident: checkout 500s", body: "Spike of 500s after deploy, root cause unknown", files: [], expect: frontier}
+12. {title: "Choose queue: SQS vs NATS", body: "Throughput, ordering, ops cost comparison", files: ["docs/arch/"], expect: frontier, edge: true}
+
+## general (12)
+
+13. {title: "Fix typo in README", body: "one word", files: ["README.md"], expect: general}
+14. {title: "Add login rate limiting", body: "Brute-force protection on auth endpoint, middleware only", files: ["src/auth/middleware.ts"], expect: general}
+15. {title: "Unit tests for cart total", body: "Cover discounts and taxes", files: ["src/cart/"], expect: general}
+16. {title: "Rename User.name to displayName", body: "Mechanical rename with codemod", files: ["src/"], expect: general}
+17. {title: "Format JSON fixtures", body: "prettify test data", files: ["test/fixtures/"], expect: general}
+18. {title: "Update deps patch versions", body: "patch-only bump, changelog check", files: ["package.json"], expect: general}
+19. {title: "Write docs for export CSV", body: "Document existing endpoint params", files: ["docs/"], expect: general}
+20. {title: "Fix flaky test cart Total", body: "Time-dependent assertion, freeze clock", files: ["test/cart.test.ts"], expect: general, edge: true}
+21. {title: "Add pagination to user list", body: "Cursor pagination, 50 per page", files: ["src/users/"], expect: general}
+22. {title: "Changelog entry for 0.1.0", body: "Summarize merged PRs", files: ["CHANGELOG.md"], expect: general}
+23. {title: "Refactor validate() helpers", body: "Split 200-line function, no behavior change", files: ["src/util/"], expect: general}
+24. {title: "Commit message for release", body: "conventional commit text", files: [], expect: general}
