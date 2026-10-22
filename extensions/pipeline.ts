@@ -11,6 +11,8 @@
  * interpolated into commands. No secrets in code or logs.
  */
 
+import { mkdir, stat, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { Type, type Message } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { jevGate } from "./jev-gate.js";
@@ -130,6 +132,67 @@ export default function (pi: ExtensionAPI): void {
 	pi.registerTool(pipelineWorktreeCreate);
 	pi.registerTool(pipelineDispatch);
 	pi.registerTool(pipelineCheck);
+
+	/** Scaffold `.pi/*` for a new repo from pinned release templates (no overwrites). */
+	pi.registerCommand("pipeline-init", {
+		description:
+			"Scaffold pi-pipeline for this repo: write .pi/bifrost.json, .pi/claude-bridge.json, .pi/mcp.json " +
+			"from the pinned release (args: ref=<tag> plan=<pro|max>). Never overwrites existing files.",
+		handler: async (args, ctx) => {
+			const params = Object.fromEntries(
+				args.split(/\s+/).flatMap((part) => {
+					const i = part.indexOf("=");
+					return i > 0 ? [[part.slice(0, i), part.slice(i + 1)]] : [];
+				}),
+			);
+			const ref = (params["ref"] ?? "v0.1.0").replace(/[^\w.\-]/g, "");
+			const plan = params["plan"] === "max" ? "max" : "pro";
+			const cwd = process.cwd();
+			const lines: string[] = [];
+			const fetchText = async (path: string): Promise<string> => {
+				const res = await fetch(`https://raw.githubusercontent.com/Ere15/pi-pipeline/${ref}/${path}`);
+				if (!res.ok) throw new Error(`template ${path}@${ref}: HTTP ${res.status}`);
+				return res.text();
+			};
+			await mkdir(join(cwd, ".pi"), { recursive: true });
+			const writeNew = async (rel: string, content: string): Promise<void> => {
+				const abs = join(cwd, rel);
+				try {
+					await stat(abs);
+					lines.push(`keep ${rel} (exists)`);
+				} catch {
+					await writeFile(abs, content.endsWith("\n") ? content : `${content}\n`);
+					lines.push(`wrote ${rel}`);
+				}
+			};
+			try {
+				await writeNew(".pi/bifrost.json", await fetchText(".pi/bifrost.json"));
+			} catch (error) {
+				lines.push(`SKIP .pi/bifrost.json: ${error instanceof Error ? error.message : error}`);
+			}
+			await writeNew(
+				".pi/claude-bridge.json",
+				JSON.stringify({ provider: { plan } }, null, 2),
+			);
+			await writeNew(
+			".pi/mcp.json",
+				JSON.stringify({ mcpServers: { mem0: { enabled: true } } }, null, 2),
+			);
+			let hasAgents = false;
+			for (const name of ["AGENTS.md", "CLAUDE.md"]) {
+				try {
+					await stat(join(cwd, name));
+					hasAgents = true;
+				} catch { /* missing */ }
+			}
+			if (!hasAgents) lines.push("WARN: no AGENTS.md/CLAUDE.md — reviewer checks conventions against it");
+			lines.push(`next: orca repo add --path ${cwd} && orca repo set-base-ref --repo <id> --ref <default>`);
+			lines.push("next: grant project trust on first pi run in this repo");
+			const text = lines.join("\n");
+			if (ctx.hasUI) ctx.ui.notify(text, "info");
+			else console.log(text);
+		},
+	});
 
 	/** Last user message text, for Jev input (data, truncated by caller). */
 	const lastUserText = (messages: readonly Message[]): string => {
