@@ -11,7 +11,7 @@
  * interpolated into commands. No secrets in code or logs.
  */
 
-import { Type } from "@earendil-works/pi-ai";
+import { Type, type Message } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { jevGate } from "./jev-gate.js";
 import { checkMessages, createWorktree, dispatchTask } from "./orca-shims.js";
@@ -130,6 +130,60 @@ export default function (pi: ExtensionAPI): void {
 	pi.registerTool(pipelineWorktreeCreate);
 	pi.registerTool(pipelineDispatch);
 	pi.registerTool(pipelineCheck);
+
+	/** Last user message text, for Jev input (data, truncated by caller). */
+	const lastUserText = (messages: readonly Message[]): string => {
+		const content = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
+		if (typeof content === "string") return content;
+		return content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("\n");
+	};
+
+	interface PipeAutoState {
+		decidedBy: string;
+	}
+
+	/**
+	 * pipeline/auto: Jev routes each user message; tool follow-ups and retries
+	 * stay on the model that started the turn. Frontier + high/xhigh thinking
+	 * goes to Opus, other frontier to Sonnet, everything else to muse-spark.
+	 */
+	pi.registerVirtualModel<PipeAutoState>({
+		provider: "pipeline",
+		id: "auto",
+		name: "Auto (pipeline)",
+		thinkingLevels: ["low", "medium", "high", "xhigh"],
+		contextWindow: 1_000_000,
+		maxTokens: 128_000,
+		async route(request, ctx) {
+			const thinkingLevel = request.thinkingLevel;
+		const sticky = request.failed ?? request.previous;
+		if (request.reason !== "user" && sticky) {
+			return { model: sticky.model, thinkingLevel: sticky.thinkingLevel ?? thinkingLevel };
+		}
+		const pick = (provider: string, id: string, decidedBy: string) => {
+			const model = ctx.modelRegistry.find(provider, id);
+			if (!model) throw new Error(`pipeline/auto: model ${provider}/${id} not in catalog`);
+			return { model, thinkingLevel, state: { decidedBy } };
+		};
+		if (request.reason === "direct") return pick("opencode-go", "muse-spark-1.3-contributor", "direct:general");
+		const verdict = await jevGate(
+			ctx,
+			{ title: lastUserText(request.messages).slice(0, 16_000) },
+			undefined,
+			request.signal,
+		);
+		if (verdict.route === "frontier") {
+				const strong = thinkingLevel === "high" || thinkingLevel === "xhigh";
+				const id = strong ? "claude-opus-5" : "claude-sonnet-5-5";
+			try {
+				return pick("claude-bridge", id, verdict.decidedBy);
+			} catch {
+				return pick("claude-bridge", "claude-sonnet-5-5", `${verdict.decidedBy}+opus-missing`);
+			}
+		}
+		return pick("opencode-go", "muse-spark-1.3-contributor", verdict.decidedBy);
+		},
+	});
 
 	// Skeleton stub: prints the stage list, performs no orchestration.
 	pi.registerCommand("sprint", {
