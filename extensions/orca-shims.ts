@@ -128,6 +128,19 @@ function pickString(data: unknown, keys: string[], fallback: string): string {
 	return fallback;
 }
 
+/**
+ * Like pickString but returns null instead of inventing a value.
+ * WHY null over fallback: a fallback id (e.g. taskId as dispatchId)
+ * makes a broken response look valid and misroutes later calls.
+ */
+function requireString(data: Record<string, unknown>, keys: string[]): string | null {
+	for (const key of keys) {
+		const value = data[key];
+		if (typeof value === "string" && value.length > 0) return value;
+	}
+	return null;
+}
+
 interface RunOptions {
 	/** Stable idempotency id; generated per call unless the caller passes one. */
 	retryRequest?: string;
@@ -137,8 +150,10 @@ interface RunOptions {
 /**
  * Spawn `orca --json …`, parse stdout, retry once with the same
  * `--retry-request` id when the reply was lost (unknown outcome).
- * Mutating verbs always send a `--retry-request` id; read-only verbs
- * send one only when the caller supplies it.
+ * Only verbs whose CLI lists `--retry-request` may pass idempotent=true;
+ * `worktree create` and `terminal create` do not list it, so they pass
+ * false and never send the flag. Read-only verbs send one only when the
+ * caller supplies it.
  */
 async function runOrcaJson(
 	verb: string,
@@ -168,6 +183,9 @@ async function runOrcaJson(
  * Create an Orca-managed worktree (verb: `worktree`).
  * `comment` attaches an initial note (covers the `comment` verb) without
  * spawning anything extra.
+ * Single attempt, no `--retry-request`: the flag is unsupported here
+ * (`orca worktree create --help` lists only `--retry-launch`), so the
+ * `retryRequest` option is accepted for uniformity but never sent.
  */
 export async function createWorktree(options: {
 	name: string;
@@ -179,20 +197,27 @@ export async function createWorktree(options: {
 	const args = ["worktree", "create", "--name", options.name];
 	if (options.baseBranch) args.push("--base-branch", options.baseBranch);
 	if (options.comment) args.push("--comment", options.comment);
-	const result = await runOrcaJson("worktree", args, options, true);
+	const result = await runOrcaJson("worktree", args, { timeoutMs: options.timeoutMs }, false);
 	if (!result.ok) return result;
 	const data = result.data as Record<string, unknown>;
+	const id = requireString(data, ["id", "worktreeId", "worktree_id"]);
+	if (id === null) return { ok: false, error: "worktree failed: response missing worktree id" };
 	return {
 		ok: true,
 		data: {
 			...data,
-			id: pickString(data, ["id", "worktreeId", "worktree_id"], options.name),
+			id,
 			name: pickString(data, ["name"], options.name),
 		},
 	};
 }
 
-/** Create a terminal session in the current worktree (verb: `terminal`). */
+/**
+ * Create a terminal session in the current worktree (verb: `terminal`).
+ * Single attempt, no `--retry-request`: the flag is unsupported here
+ * (`orca terminal create --help` lists no such flag), so the
+ * `retryRequest` option is accepted for uniformity but never sent.
+ */
 export async function createTerminal(options: {
 	worktree?: string;
 	retryRequest?: string;
@@ -200,7 +225,7 @@ export async function createTerminal(options: {
 }): Promise<OrcaResult<TerminalInfo>> {
 	const args = ["terminal", "create"];
 	if (options.worktree) args.push("--worktree", options.worktree);
-	const result = await runOrcaJson("terminal", args, options, true);
+	const result = await runOrcaJson("terminal", args, { timeoutMs: options.timeoutMs }, false);
 	if (!result.ok) return result;
 	const data = result.data as Record<string, unknown>;
 	return {
@@ -225,11 +250,13 @@ export async function dispatchTask(options: {
 	const result = await runOrcaJson("dispatch", args, options, true);
 	if (!result.ok) return result;
 	const data = result.data as Record<string, unknown>;
+	const dispatchId = requireString(data, ["dispatchId", "dispatch_id", "id"]);
+	if (dispatchId === null) return { ok: false, error: "dispatch failed: response missing dispatch id" };
 	return {
 		ok: true,
 		data: {
 			...data,
-			dispatchId: pickString(data, ["dispatchId", "dispatch_id", "id"], options.taskId),
+			dispatchId,
 		},
 	};
 }
