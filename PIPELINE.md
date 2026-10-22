@@ -26,11 +26,13 @@ orca orchestration run-create --objective "sprint-N: <цель> | budget-stop: $
 # ГЕЙТ: комплектность проверяет координатор на frontier-модели. Затем п.1.
 ```
 
-## 1. ARCH (pi + anthropic/opus, high, /skill:sprint-arch)
+## 1. ARCH (pi + bridge/opus, high, /skill:sprint-arch)
 
 ```bash
-orca worktree create --repo id:<repo> --name sprint-N-arch --json
-orca terminal create --worktree name:sprint-N-arch --command "pi --model anthropic/claude-opus-5 --thinking high" --json
+# worktree create — из директории репо (инференс); --repo id: даёт repo_not_found.
+orca worktree create --name sprint-N-arch --json
+# ARCH-терминал: opus через bridge (квота подписки); прямой anthropic упрётся в Extra Usage без баланса.
+orca terminal create --worktree name:sprint-N-arch --command "pi --model claude-bridge/claude-opus-5 --thinking high" --json
 # → term-arch
 orca orchestration worker-start --task <t-arch> --terminal term-arch --json
 # spec: Target docs/arch. Change: ADR + диаграмма + декомпозиция + «как тестировать».
@@ -56,7 +58,7 @@ route: arch.p>=0.7 ИЛИ risk.value>=1.5 ИЛИ owner==frontier → frontier-м
 ## 3. FAN-OUT (по worktree + терминалу на направление, reuse внутри)
 
 ```bash
-orca worktree create --repo id:<repo> --name feat-<x> --json
+orca worktree create --name feat-<x> --json
 orca terminal create --worktree name:feat-<x> --command "pi --model opencode-go/muse-spark-1.3-contributor --thinking medium" --json
 # → term-<x> (один PID на всё направление)
 orca orchestration worker-start --task <t1> --terminal term-<x> --json
@@ -88,6 +90,7 @@ orca orchestration worker-start --task <t-int> --terminal <term-int или reuse
 ## 5. REVIEW (pi + anthropic/sonnet, high, read-only, /skill:sprint-review)
 
 ```bash
+# REVIEW: sonnet через bridge (модель терминала: pi --model claude-bridge/claude-sonnet-5-5 --thinking high).
 orca orchestration worker-start --task <t-rev> --terminal term-review --json
 # spec: Target diff main...sprint-N. Change: REVIEW.md (вердикт по тестам + readability-вердикт + must-fix).
 # Constraints: только read, правки запрещены. Acceptance: REVIEW.md + must-fix со ссылками на строки.

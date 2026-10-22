@@ -129,7 +129,7 @@ term-review (pi, frontier)        — архитектура в начале, р
 ## Модели и thinking
 
 - Координатор: opencode-go/muse-spark, medium (отдельные ходы — frontier при нужде).
-- ARCH: anthropic/opus, high. REVIEW: anthropic/sonnet, high.
+- ARCH: claude-bridge/opus, high (квота подписки; прямой anthropic — только при живом Extra Usage). REVIEW: claude-bridge/sonnet, high.
 - Implement general: opencode-go, medium. Implement-frontier: anthropic/sonnet, high.
 - Терминалы стартуют с моделью/уровнем своей стадии (`pi --model ... --thinking ...`).
 
