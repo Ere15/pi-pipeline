@@ -17,7 +17,12 @@ import { Type, type Message } from "@earendil-works/pi-ai";
 import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { jevGate } from "./jev-gate.js";
 import { buildRecallQuery, formatStageSummary } from "./mem0.js";
-import { checkMessages, createWorktree, dispatchTask } from "./orca-shims.js";
+import {
+	checkMessages,
+	createWorktree,
+	dispatchTask,
+	formatOrcaError,
+} from "./orca-shims.js";
 
 /** Sprint stages from ARCHITECTURE.md flow; `/sprint` prints these (stub). */
 const SPRINT_STAGES: readonly string[] = [
@@ -75,7 +80,7 @@ const pipelineWorktreeCreate = defineTool({
 			baseBranch: params.baseBranch,
 			comment: params.comment,
 		});
-		const text = result.ok ? JSON.stringify(result.data) : result.error;
+		const text = result.ok ? JSON.stringify(result.data) : formatOrcaError(result.error);
 		return {
 			content: [{ type: "text", text }],
 			details: result,
@@ -95,7 +100,7 @@ const pipelineDispatch = defineTool({
 	}),
 	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
 		const result = await dispatchTask({ taskId: params.taskId, to: params.to, from: params.from });
-		const text = result.ok ? JSON.stringify(result.data) : result.error;
+		const text = result.ok ? JSON.stringify(result.data) : formatOrcaError(result.error);
 		return {
 			content: [{ type: "text", text }],
 			details: result,
@@ -120,7 +125,7 @@ const pipelineCheck = defineTool({
 	}),
 	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
 		const result = await checkMessages({ terminal: params.terminal, waitMs: params.waitMs });
-		const text = result.ok ? JSON.stringify(result.data) : result.error;
+		const text = result.ok ? JSON.stringify(result.data) : formatOrcaError(result.error);
 		return {
 			content: [{ type: "text", text }],
 			details: result,
