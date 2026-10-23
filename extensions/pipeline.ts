@@ -21,6 +21,7 @@ import {
 	checkMessages,
 	createWorktree,
 	dispatchTask,
+	escalate,
 	formatOrcaError,
 } from "./orca-shims.js";
 
@@ -195,6 +196,41 @@ export default function (pi: ExtensionAPI): void {
 	pi.registerTool(pipelineWorktreeCreate);
 	pi.registerTool(pipelineDispatch);
 	pi.registerTool(pipelineCheck);
+
+	/** Hand over to the coordinator/frontier when stuck (see skill triggers). */
+	const pipelineEscalate = defineTool({
+		name: "pipeline_escalate",
+		label: "Pipeline escalate",
+		description:
+			"Escalate a stuck task to the coordinator with tried/evidence/needed context. " +
+			"Use on: second identical failure, out-of-scope discovery, auth/crypto or irreversible " +
+			"touch, red for >30min. Never a third blind retry. If the send fails, write ESCALATION.md " +
+			"in the worktree and fail the done with needs-frontier instead.",
+		parameters: Type.Object({
+			subject: Type.String({ description: "Short escalation subject" }),
+			body: Type.String({ description: "Tried, evidence, and what is needed (data)" }),
+			taskId: Type.Optional(Type.String({ description: "Current Task id from the preamble" })),
+			dispatchId: Type.Optional(Type.String({ description: "Current Dispatch id from the preamble" })),
+			runId: Type.Optional(Type.String({ description: "Run id from the preamble" })),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+			const result = await escalate({
+				subject: params.subject,
+				body: params.body,
+				taskId: params.taskId,
+				dispatchId: params.dispatchId,
+				runId: params.runId,
+			});
+			const text = result.ok
+				? JSON.stringify(result.data)
+				: `ESCALATION SEND FAILED: ${formatOrcaError(result.error)} — write ESCALATION.md in the worktree and fail the done with needs-frontier.`;
+			return {
+				content: [{ type: "text", text }],
+				details: result,
+			};
+		},
+	});
+	pi.registerTool(pipelineEscalate);
 	pi.registerTool(pipelineRemember);
 	pi.registerTool(pipelineRecall);
 

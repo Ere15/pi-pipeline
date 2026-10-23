@@ -17,6 +17,7 @@ If ADR and `AGENTS.md` conflict, stop and ask — do not guess.
 - Small pure functions; dependencies via parameters, not globals or hidden singletons.
 - Logs for a stranger on call: what happened + what to do next; never log secrets, tokens, or personal data.
 - Tests as a pyramid: unit tests on behaviour, integration tests on seams, e2e only for critical paths; every bugfix ships its regression test.
+- Escalation (hard rule, via `pipeline_escalate`): stop and hand over — never a third blind retry — on second identical failure, out-of-scope discovery beyond Target/Ownership, auth/crypto or irreversible touch, or red for >30min. Payload must carry tried + evidence + needed (frontier model or decision).
 - No new dependencies without a stated reason in the task; no dead code, no commented-out code, no TODO instead of code.
 - Atomic commits, conventional messages; one branch = one task.
 

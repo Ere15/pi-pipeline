@@ -81,7 +81,8 @@ orca orchestration worker-start --task <t1> --terminal term-<x> --json
 # Воркер ОБЯЗАН закоммитить результат в ветке своего worktree — незакоммиченный done неполный.
 orca orchestration check --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json
 # validate done: evidence есть? тесты зелёные? нет → вернуть (done-check).
-# вопросы → reply. следующий таск на ТОТ ЖЕ терминал:
+# вопросы → reply. escalation → gate: frontier follow-up диспатчем на ТОТ ЖЕ терминал
+# (reuse, модель из гейта), wave продолжается. следующий таск на ТОТ ЖЕ терминал:
 orca orchestration worker-show --dispatch <disp_1> --json   # proven handle
 orca orchestration worker-start --task <t2> --terminal term-<x> --json
 # ... повторять до закрытия всех Task направления. release НЕ делаем (терминал ещё нужен).

@@ -84,6 +84,11 @@ export interface ReplyInfo {
 	[key: string]: unknown;
 }
 
+export interface EscalationInfo {
+	messageId: string;
+	[key: string]: unknown;
+}
+
 export interface ReleaseInfo {
 	status: string;
 	[key: string]: unknown;
@@ -459,6 +464,40 @@ export async function replyToMessage(
 	const data = result.data as Record<string, unknown>;
 	const messageId = requireString(data, ["messageId", "message_id", "id"]);
 	if (messageId === null) return { ok: false, error: missingId(options.comment === true ? "comment" : "reply", "message id") };
+	return {
+		ok: true,
+		data: {
+			...data,
+			messageId,
+		},
+	};
+}
+
+/**
+ * Escalate to the coordinator (verb: `send` with `--type escalation`).
+ * WHY a dedicated verb: a stuck worker must hand over with context (tried,
+ * evidence, needed) instead of failing silently or retrying forever.
+ * Triggers: second identical failure, out-of-scope discovery, auth/crypto or
+ * irreversible touch, red for >30min. Never a third blind retry.
+ */
+export async function escalate(
+	options: RecoveryOptions & {
+		subject: string;
+		body: string;
+		taskId?: string;
+		dispatchId?: string;
+		runId?: string;
+	},
+): Promise<OrcaResult<EscalationInfo>> {
+	const args = ["orchestration", "send", "--type", "escalation", "--subject", options.subject, "--body", options.body];
+	if (options.runId) args.push("--run", options.runId);
+	if (options.taskId) args.push("--task-id", options.taskId);
+	if (options.dispatchId) args.push("--dispatch-id", options.dispatchId);
+	const result = await runOrcaJson("escalate", args, options, true);
+	if (!result.ok) return result;
+	const data = result.data as Record<string, unknown>;
+	const messageId = requireString(data, ["messageId", "message_id", "id"]);
+	if (messageId === null) return { ok: false, error: missingId("escalate", "message id") };
 	return {
 		ok: true,
 		data: {

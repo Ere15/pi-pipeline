@@ -1,6 +1,6 @@
 {
   "name": "pi-pipeline",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Sprint pipeline for pi: opencode-go routine, frontier arch/review, orca worktrees, Jev routing, mem0 memory",
   "license": "MIT",
   "keywords": [

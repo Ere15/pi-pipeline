@@ -22,6 +22,7 @@ import {
 	DEFAULT_BACKOFF_MS,
 	DEFAULT_TIMEOUT_MS,
 	dispatchTask,
+	escalate,
 	formatOrcaError,
 	releaseWorker,
 	replyToMessage,
@@ -455,6 +456,36 @@ Deno.test({
 			const result = await replyToMessage({ id: "q-1", body: "hi" });
 			ok(result.ok);
 			strictEqual(result.data.messageId, "m-1");
+		});
+	},
+});
+
+Deno.test({
+	name: "escalate sends type escalation with task context",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(jsonScript('{"messageId":"e-1"}'), async () => {
+			const result = await escalate({
+				subject: "stuck on auth",
+				body: "tried x, evidence y, need frontier",
+				taskId: "t-1",
+				dispatchId: "d-1",
+				runId: "run-1",
+			});
+			ok(result.ok);
+			strictEqual(result.data.messageId, "e-1");
+		});
+	},
+});
+
+Deno.test({
+	name: "escalate reports a missing message id instead of inventing one",
+	permissions: PERMS,
+	fn: async () => {
+		await withFakeOrca(jsonScript("{}"), async () => {
+			const result = await escalate({ subject: "stuck", body: "ctx" });
+			ok(!result.ok);
+			strictEqual((result.error as OrcaError).code, "ORCA_BAD_RESPONSE");
 		});
 	},
 });
